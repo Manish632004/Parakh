@@ -1,4 +1,5 @@
 import os
+import tempfile
 import numpy as np
 import cv2
 import pandas as pd
@@ -7,6 +8,8 @@ from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.metrics import classification_report, accuracy_score, confusion_matrix
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.impute import SimpleImputer
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import logging
 from pathlib import Path
@@ -187,13 +190,15 @@ def classify_particles(model, le, scaler, imputer, feature_cols, particles):
     for p in particles:
         feat = [p.get(col, 0) for col in feature_cols]  # Default 0 if missing
         features.append(feat)
-    
-    features = np.array(features)
-    features = imputer.transform(features)  # Impute if needed
-    features = scaler.transform(features)
-    
-    predictions = model.predict(features)
-    probabilities = model.predict_proba(features)
+
+    # Ensure transformers receive named columns to avoid warnings
+    features_arr = np.array(features)
+    features_df = pd.DataFrame(features_arr, columns=feature_cols)
+    features_imputed = imputer.transform(features_df)  # Impute if needed
+    features_scaled = scaler.transform(features_imputed)
+
+    predictions = model.predict(features_scaled)
+    probabilities = model.predict_proba(features_scaled)
     
     classifications = []
     for i, pred in enumerate(predictions):
@@ -261,9 +266,9 @@ def analyze_image(image_path):
         }
     }
 
-    # Optional: save visualization
-    output_image_path = "detection_output.png"
-    import cv2, matplotlib.pyplot as plt
+    # Optional: save visualization (unique temp file per request)
+    fd, output_image_path = tempfile.mkstemp(suffix=".png")
+    os.close(fd)
     image = cv2.imread(image_path)
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     plt.figure(figsize=(10, 8))

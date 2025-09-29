@@ -23,7 +23,7 @@ DATA_DIR = 'datasets'
 CSV_FILE = 'samples_geocoded.csv'  
 IMG_SIZE_FOR_FEATURES = (100, 100)  # For patch processing
 INPUT_IMAGE_PATH = 'sample_input_image.jpg'  # Replace with your water sample image (JPG/PNG)
-PIXEL_TO_MICRON = 1.0  # Calibration factor; adjust based on image scale (e.g., 0.5 pixels per micron)
+PIXEL_TO_MICRON = 1.0  # Microns per pixel; set from your imaging setup (e.g., 0.5 means 0.5 µm per pixel)
 MIN_AREA_PIXELS = 50  # Minimum particle area to detect
 CLASSES = ['non_plastic', 'PE', 'PP', 'PS', 'PET']  # Common polymer types; adjust based on CSV
 MODEL_PATH = 'microplastics_tabular_model.pkl'
@@ -156,8 +156,9 @@ def detect_and_extract_features(image_path, pixel_to_micron=PIXEL_TO_MICRON, min
     for contour in contours:
         area_pixels = cv2.contourArea(contour)
         if area_pixels > min_area:
-            # Size in microns
-            size_microns = area_pixels * pixel_to_micron  # Approximate area; use sqrt for diameter if needed
+            # Equivalent diameter (microns): 2*sqrt(area/pi) in pixels, scaled by microns-per-pixel
+            equiv_diameter_px = 2 * np.sqrt(area_pixels / np.pi)
+            size_microns = equiv_diameter_px * pixel_to_micron
             
             # Bounding rect for aspect ratio
             x, y, w, h = cv2.boundingRect(contour)
@@ -221,8 +222,14 @@ def main():
     """
     # model.py ke end me add karo
 
-def analyze_image(image_path):
+def analyze_image(image_path, pixel_to_micron=None, min_area=None):
     import joblib
+    # Resolve calibration/min area defaults
+    if pixel_to_micron is None:
+        pixel_to_micron = PIXEL_TO_MICRON
+    if min_area is None:
+        min_area = MIN_AREA_PIXELS
+
     # 1. Load model + preprocessors (train if missing)
     try:
         model = joblib.load(MODEL_PATH)
@@ -239,7 +246,7 @@ def analyze_image(image_path):
         scaler = joblib.load('scaler.pkl')
 
     # 2. Detect particles
-    particles = detect_and_extract_features(image_path)
+    particles = detect_and_extract_features(image_path, pixel_to_micron=pixel_to_micron, min_area=min_area)
 
     if len(particles) == 0:
         return {"particles": [], "summary": {"total": 0, "microplastics": 0}}, image_path

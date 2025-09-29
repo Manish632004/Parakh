@@ -19,9 +19,25 @@ def detect_microplastics():
     os.makedirs("uploads", exist_ok=True)
     file.save(upload_path)  # Flask stores the uploaded file if save() is called:contentReference[oaicite:4]{index=4}
 
+    # Optional calibration params from form
+    ppm_raw = request.form.get("pixel_to_micron")
+    min_area_raw = request.form.get("min_area")
+    ppm = None
+    min_area = None
+    try:
+        if ppm_raw is not None and ppm_raw != "":
+            ppm = float(ppm_raw)
+    except Exception:
+        ppm = None
+    try:
+        if min_area_raw is not None and min_area_raw != "":
+            min_area = int(min_area_raw)
+    except Exception:
+        min_area = None
+
     # Run model inference
     try:
-        result, vis_path = analyze_image(upload_path)
+        result, vis_path = analyze_image(upload_path, pixel_to_micron=ppm, min_area=min_area)
     except Exception as e:
         # Cleanup temp file
         try:
